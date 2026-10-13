@@ -30,6 +30,7 @@ export function NewSessionPage() {
   useEffect(() => {
     api.getSettings().then((s) => setMeta((m) => ({ ...m, noise_reduction: s.noise_reduction })), () => undefined);
   }, []);
+  const [recording, setRecording] = useState(false);
   const ready = metaIsValid(meta);
   const open = (id: number) => navigate(`/sessions/${id}`);
 
@@ -43,17 +44,19 @@ export function NewSessionPage() {
       <Card>
         <CardHeader>
           <CardTitle>Session details</CardTitle>
-          <CardDescription>Use a client code, never a real name.</CardDescription>
+          <CardDescription>
+            {recording ? "Locked while recording." : "Use a client code, never a real name."}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <SessionDetailsForm value={meta} onChange={setMeta} />
+          <SessionDetailsForm value={meta} onChange={setMeta} disabled={recording} />
         </CardContent>
       </Card>
 
       <Tabs value={mode} onValueChange={(v) => setParams({ mode: v }, { replace: true })}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="record"><Mic /> Record</TabsTrigger>
-          <TabsTrigger value="upload"><UploadCloud /> Upload</TabsTrigger>
+          <TabsTrigger value="upload" disabled={recording}><UploadCloud /> Upload</TabsTrigger>
         </TabsList>
 
         <TabsContent value="record" forceMount className="data-[state=inactive]:hidden">
@@ -64,6 +67,7 @@ export function NewSessionPage() {
                 ready={ready}
                 onSuggestNoise={(level) => setMeta((m) => ({ ...m, noise_reduction: level }))}
                 onFinished={open}
+                onActiveChange={setRecording}
               />
             </CardContent>
           </Card>

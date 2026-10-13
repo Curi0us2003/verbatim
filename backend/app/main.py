@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, Requ
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import Session as DBSession
-from sqlmodel import delete, select
+from sqlmodel import select
 
 from . import export, prefs, security, storage
 from .ai import llm

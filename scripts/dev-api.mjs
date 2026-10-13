@@ -8,7 +8,7 @@ const port = env.APP_PORT || "8000";
 
 const child = spawn(
   venvPython(),
-  ["-m", "uvicorn", "app.main:app", "--reload", "--reload-dir", "app", "--host", host, "--port", port],
+  ["-m", "uvicorn", "app.main:app", "--reload", "--reload-dir", "app", "--timeout-graceful-shutdown", "3", "--host", host, "--port", port],
   { cwd: BACKEND, stdio: "inherit" }
 );
 child.on("exit", (code) => process.exit(code ?? 0));

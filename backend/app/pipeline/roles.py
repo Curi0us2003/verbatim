@@ -22,6 +22,18 @@ def is_question(text: str) -> bool:
     return t.endswith("?") or bool(QUESTION_START.match(t))
 
 
+def guess_speakers_without_diarization(segments: list[dict]) -> list[str]:
+    """Fallback when speaker separation is unavailable: label each segment SPEAKER_00 (counsellor
+    guess) or SPEAKER_01 (client guess). Questions are the counsellor's; a statement that runs
+    straight into a counsellor question (e.g. "That sounds tiring. What helps?") is too."""
+    labels = ["SPEAKER_00" if is_question(s["text"]) else "SPEAKER_01" for s in segments]
+    for i in range(len(segments) - 2, -1, -1):
+        gap = segments[i + 1]["start"] - segments[i]["end"]
+        if labels[i] == "SPEAKER_01" and labels[i + 1] == "SPEAKER_00" and gap < 0.8:
+            labels[i] = "SPEAKER_00"
+    return labels
+
+
 def heuristic(turns: list[dict]) -> tuple[str, float]:
     """Returns (likely counsellor speaker, margin 0–1). turns: [{speaker_raw, text}] in order."""
     speakers: list[str] = []

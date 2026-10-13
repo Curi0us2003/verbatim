@@ -18,6 +18,7 @@ interface Props {
   ready: boolean;
   onSuggestNoise: (level: NoiseLevel) => void;
   onFinished: (sessionId: number) => void;
+  onActiveChange?: (active: boolean) => void;
 }
 
 function extFor(mime: string): string {
@@ -27,7 +28,7 @@ function extFor(mime: string): string {
 }
 
 /** Live recording (F2) with a level meter, background-noise check and 30-second chunk uploads. */
-export function Recorder({ meta, ready, onSuggestNoise, onFinished }: Props) {
+export function Recorder({ meta, ready, onSuggestNoise, onFinished, onActiveChange }: Props) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [elapsed, setElapsed] = useState(0);
   const [level, setLevel] = useState(0);
@@ -47,6 +48,7 @@ export function Recorder({ meta, ready, onSuggestNoise, onFinished }: Props) {
   const quietSamples = useRef<number[]>([]);
 
   const active = phase === "recording" || phase === "paused" || phase === "finishing";
+  useEffect(() => onActiveChange?.(active), [active, onActiveChange]);
 
   // Warn before closing the tab while recording (F2).
   useEffect(() => {

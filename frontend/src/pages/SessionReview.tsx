@@ -112,7 +112,8 @@ export function SessionReviewPage() {
       if (target.closest("input, textarea, select, [contenteditable='true'], [role='dialog'], [role='menu']")) return;
       const key = e.key.toLowerCase();
       if (key === " ") {
-        if (target.closest("button, a, [role='button']")) return; // let Space press the focused control
+        // Space plays/pauses inside the transcript and player; elsewhere it presses the focused button as usual.
+        if (target.closest("button, a, [role='button']") && !target.closest("[data-turn-id], [data-audio-bar]")) return;
         e.preventDefault();
         player.toggle();
       } else if (key === "j") player.skip(-5);
@@ -169,8 +170,14 @@ export function SessionReviewPage() {
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">{session.title}</h1>
           <p className="mt-1 text-muted-foreground">
-            {session.client_code} · {formatDate(session.created_at)} · {formatDuration(session.duration_sec)} ·{" "}
-            {languageLabel(session.detected_language ?? session.language)}
+            {[
+              session.client_code,
+              formatDate(session.created_at),
+              session.duration_sec != null && formatDuration(session.duration_sec),
+              languageLabel(session.detected_language ?? session.language),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         </div>
         {(session.status === "ready" || session.status === "insights") && (

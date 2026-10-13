@@ -19,7 +19,7 @@ interface Props {
 export function AudioBar({ audioRef, src, time, duration, playing, onTogglePlay, onSeek, onSkip, unavailableReason }: Props) {
   const disabled = !src;
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-card/95 backdrop-blur print:hidden">
+    <div data-audio-bar className="fixed inset-x-0 bottom-0 z-30 border-t bg-card/95 backdrop-blur print:hidden">
       {src && <audio ref={audioRef} src={src} preload="metadata" />}
       <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6">
         <Button variant="ghost" size="icon" onClick={() => onSkip(-5)} disabled={disabled} aria-label="Back 5 seconds (J)" title="Back 5 s (J)">

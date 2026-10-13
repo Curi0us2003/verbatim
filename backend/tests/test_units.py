@@ -112,3 +112,19 @@ def test_chat_json_retries_once(monkeypatch):
     monkeypatch.setattr(llm, "complete", lambda m: next(replies2))
     with pytest.raises(LLMError):
         chat_json("s", "u", Thing)
+
+
+def test_fallback_speaker_guess_keeps_reflection_with_question():
+    from app.pipeline.roles import guess_speakers_without_diarization
+
+    segments = [
+        {"start": 0.0, "end": 2.0, "text": "Hello, thanks for coming in today."},
+        {"start": 2.3, "end": 4.0, "text": "How have you been feeling this week?"},
+        {"start": 5.0, "end": 8.0, "text": "Honestly, it has been hard."},
+        {"start": 11.0, "end": 12.0, "text": "That sounds really tiring."},
+        {"start": 12.2, "end": 14.0, "text": "What goes through your mind at night?"},
+        {"start": 15.0, "end": 17.0, "text": "Mostly that I will fail."},
+    ]
+    assert guess_speakers_without_diarization(segments) == [
+        "SPEAKER_00", "SPEAKER_00", "SPEAKER_01", "SPEAKER_00", "SPEAKER_00", "SPEAKER_01",
+    ]

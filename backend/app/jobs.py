@@ -23,7 +23,7 @@ from .ai.llm import LLMError
 from .models import PROCESSING, Exchange, Role, Session, SessionStatus, Summary, Turn, engine, utcnow
 from .pipeline import audio as audio_mod
 from .pipeline.diarize import DiarizationUnavailable, diarize
-from .pipeline.roles import detect_counsellor, is_question
+from .pipeline.roles import detect_counsellor, guess_speakers_without_diarization
 from .pipeline.transcribe import transcribe
 from .pipeline.turns import build_turns, rebuild_exchanges
 
@@ -72,12 +72,12 @@ class Worker:
             kind, session_id = self._queue.get()
             try:
                 if kind == "process":
-                    process_session(session_id, lambda p: self._set(session_id, p))
+                    process_session(session_id, lambda p, sid=session_id: self._set(sid, p))
                     if prefs.load().auto_insights:
                         self._pending.add(("insights", session_id))
                         self._queue.put(("insights", session_id))
                 elif kind == "insights":
-                    insights_job(session_id, lambda p: self._set(session_id, p))
+                    insights_job(session_id, lambda p, sid=session_id: self._set(sid, p))
             except Exception:
                 log.exception("Job %s for session %s crashed", kind, session_id)
             finally:
@@ -175,23 +175,26 @@ def _process(session_id: int, progress) -> None:
     warning = None
     try:
         segments = diarize(audio, segments, progress)
-        split = False
+        guessed = False
     except DiarizationUnavailable as exc:
+        # Still give a usable transcript: guess speakers from questions, the counsellor can fix them.
         warning = str(exc)
-        split = True
+        guessed = True
+        for seg, label in zip(segments, guess_speakers_without_diarization(segments)):
+            seg["speaker"] = label
+            for w in seg["words"]:
+                w.pop("speaker", None)
     del audio
 
-    turn_dicts = build_turns(segments, split_every_segment=split)
+    turn_dicts = build_turns(segments)
     if not turn_dicts:
         raise PipelineError("No speech was found in this recording.")
-    if split:
-        # Without speaker separation, guess each turn's role from whether it is a question.
-        counsellor = None
-        roles = [Role.counsellor if is_question(t["text"]) else Role.client for t in turn_dicts]
+    if guessed:
+        counsellor = "SPEAKER_00"
     else:
         counsellor, how = detect_counsellor(turn_dicts)
         log.info("Session %s: counsellor is %s (%s)", session_id, counsellor, how)
-        roles = [Role.counsellor if t["speaker_raw"] == counsellor else Role.client for t in turn_dicts]
+    roles = [Role.counsellor if t["speaker_raw"] == counsellor else Role.client for t in turn_dicts]
 
     with DBSession(engine) as db:
         clear_transcript(db, session_id)
