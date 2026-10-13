@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+/* Dark mode is switched by a "dark" class on <html> (toggle arrives in Phase 7). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Palette from SPEC.md → UI design guidelines. */
+:root {
+  --background: #faf8f5; /* warm off-white */
+  --foreground: #1f2933; /* dark slate */
+  --card: #ffffff;
+  --muted: #f2efea;
+  --muted-foreground: #56616c;
+  --border: #e5e0d8;
+  /* Sage accent. #5B8C7A with white text is only 3.8:1, below the spec's 4.5:1 rule,
+     so filled buttons use a deeper sage (5.1:1). #5B8C7A stays for accents and rings. */
+  --primary: #4a7666;
+  --primary-foreground: #ffffff;
+  --sage: #5b8c7a;
+  --ring: #5b8c7a;
+  --counsellor: #e8f0fb;
+  --counsellor-border: #6b9bd2;
+  --counsellor-ink: #2c5a8c;
+  --client: #fdf3e3;
+  --client-border: #d9a55b;
+  --client-ink: #8a5a17;
+  --risk: #c2504a;
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: #171a1d;
+  --foreground: #e8e6e3;
+  --card: #1f2327;
+  --muted: #2a2f34;
+  --muted-foreground: #a3abb3;
+  --border: #353b41;
+  --primary: #6fa592;
+  --primary-foreground: #0f1a16;
+  --sage: #6fa592;
+  --ring: #6fa592;
+  --counsellor: #1e2a3a;
+  --counsellor-border: #6b9bd2;
+  --counsellor-ink: #a9c6ea;
+  --client: #33291b;
+  --client-border: #d9a55b;
+  --client-ink: #e9c48e;
+  --risk: #e07a73;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-sage: var(--sage);
+  --color-ring: var(--ring);
+  --color-counsellor: var(--counsellor);
+  --color-counsellor-border: var(--counsellor-border);
+  --color-counsellor-ink: var(--counsellor-ink);
+  --color-client: var(--client);
+  --color-client-border: var(--client-border);
+  --color-client-ink: var(--client-ink);
+  --color-risk: var(--risk);
+
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --animate-slide-up: slide-up 200ms ease-out;
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+/* Transcript reading size from the spec: 17 px, 1.6 line height. */
+.transcript-text {
+  font-size: 17px;
+  line-height: 1.6;
+}
