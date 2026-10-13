@@ -1,4 +1,4 @@
-// Mirrors the SQLModel tables in backend/app/models.py.
+// Mirrors the models in backend/app/models.py.
 
 export type SessionStatus =
   | "uploading"
@@ -10,6 +10,7 @@ export type SessionStatus =
   | "failed";
 
 export type Role = "counsellor" | "client";
+export type NoiseLevel = "off" | "light" | "strong";
 
 export interface Word {
   word: string;
@@ -42,15 +43,26 @@ export interface Insight {
   risk_note: string;
 }
 
+/** Stored when the AI gave invalid JSON twice (SPEC: show "Insight unavailable"). */
+export interface InsightUnavailable {
+  unavailable: true;
+  error: string;
+  detail?: string;
+}
+
 export interface Exchange {
   id: number;
   session_id: number;
   index: number;
   counsellor_turn_ids: number[];
   client_turn_ids: number[];
-  insight_json: Insight | null;
+  insight_json: Insight | InsightUnavailable | null;
   counsellor_feedback: "agree" | "disagree" | null;
   counsellor_note: string | null;
+}
+
+export function isInsight(value: Exchange["insight_json"]): value is Insight {
+  return !!value && "client_meaning" in value;
 }
 
 export interface SummaryData {
@@ -76,12 +88,17 @@ export interface SessionRecord {
   title: string;
   client_code: string;
   language: string;
+  detected_language: string | null;
   created_at: string;
   consent_at: string | null;
   duration_sec: number | null;
   status: SessionStatus;
   error: string | null;
+  warning: string | null;
   counsellor_speaker: string | null;
+  noise_reduction: NoiseLevel;
+  has_audio: boolean;
+  audio_deleted_at: string | null;
 }
 
 export interface SessionDetail extends SessionRecord {
@@ -90,11 +107,32 @@ export interface SessionDetail extends SessionRecord {
   summary: Summary | null;
 }
 
+export interface StatusInfo {
+  status: SessionStatus;
+  percent: number;
+  error: string | null;
+  warning: string | null;
+}
+
 export interface Health {
   status: string;
   transcribe_engine: "local" | "groq";
   llm_engine: "ollama" | "groq";
   cloud_mode: boolean;
+  checks: {
+    ffmpeg: boolean;
+    whisperx: boolean;
+    hf_token: boolean;
+    encryption: boolean;
+    whisper_model: string;
+    llm_model: string;
+  };
+}
+
+export interface AppSettings {
+  retention_days: number;
+  auto_insights: boolean;
+  noise_reduction: NoiseLevel;
 }
 
 /** Metadata the counsellor fills in before recording or uploading (F2, F5). */
@@ -104,4 +142,5 @@ export interface SessionMeta {
   language: string;
   date: string; // yyyy-mm-dd
   consent: boolean;
+  noise_reduction: NoiseLevel;
 }

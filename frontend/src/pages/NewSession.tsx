@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Mic, UploadCloud } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { api } from "@/api";
 import type { SessionMeta } from "@/types";
-import { ProgressSteps } from "@/components/ProgressSteps";
 import { Recorder } from "@/components/Recorder";
 import { SessionDetailsForm, metaIsValid } from "@/components/SessionDetailsForm";
 import { UploadZone } from "@/components/UploadZone";
@@ -15,6 +15,7 @@ function today(): string {
 }
 
 export function NewSessionPage() {
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const mode = params.get("mode") === "upload" ? "upload" : "record";
   // One form shared by both tabs, so switching tabs keeps what was typed.
@@ -24,8 +25,13 @@ export function NewSessionPage() {
     language: "auto",
     date: today(),
     consent: false,
+    noise_reduction: "light",
   });
+  useEffect(() => {
+    api.getSettings().then((s) => setMeta((m) => ({ ...m, noise_reduction: s.noise_reduction })), () => undefined);
+  }, []);
   const ready = metaIsValid(meta);
+  const open = (id: number) => navigate(`/sessions/${id}`);
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -46,34 +52,27 @@ export function NewSessionPage() {
 
       <Tabs value={mode} onValueChange={(v) => setParams({ mode: v }, { replace: true })}>
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="record">
-            <Mic /> Record
-          </TabsTrigger>
-          <TabsTrigger value="upload">
-            <UploadCloud /> Upload
-          </TabsTrigger>
+          <TabsTrigger value="record"><Mic /> Record</TabsTrigger>
+          <TabsTrigger value="upload"><UploadCloud /> Upload</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="record">
+        <TabsContent value="record" forceMount className="data-[state=inactive]:hidden">
           <Card>
             <CardContent className="pt-6">
-              <Recorder ready={ready} />
+              <Recorder
+                meta={meta}
+                ready={ready}
+                onSuggestNoise={(level) => setMeta((m) => ({ ...m, noise_reduction: level }))}
+                onFinished={open}
+              />
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="upload" className="space-y-6">
+        <TabsContent value="upload">
           <Card>
             <CardContent className="pt-6">
-              <UploadZone ready={ready} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">What happens next</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ProgressSteps current={null} />
+              <UploadZone meta={meta} ready={ready} onUploaded={open} />
             </CardContent>
           </Card>
         </TabsContent>

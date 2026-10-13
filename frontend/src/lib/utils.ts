@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { NoiseLevel } from "@/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -26,6 +27,7 @@ export function formatDate(iso: string): string {
 
 export function formatDuration(seconds: number | null): string {
   if (seconds == null) return "—";
+  if (seconds < 60) return `${Math.round(seconds)} s`;
   const m = Math.round(seconds / 60);
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
 }
@@ -40,3 +42,9 @@ export const LANGUAGES = [
 export function languageLabel(code: string): string {
   return LANGUAGES.find((l) => l.value === code)?.label ?? code;
 }
+
+export const NOISE_OPTIONS: { value: NoiseLevel; label: string }[] = [
+  { value: "off", label: "Off — quiet room, good microphone" },
+  { value: "light", label: "Light — a normal room (recommended)" },
+  { value: "strong", label: "Strong — fan, AC, traffic or a busy place" },
+];

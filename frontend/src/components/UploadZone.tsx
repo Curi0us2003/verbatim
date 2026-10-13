@@ -1,6 +1,9 @@
 import { useRef, useState } from "react";
 import { FileAudio, UploadCloud, X } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "@/api";
+import type { SessionMeta } from "@/types";
+import { ProgressSteps } from "@/components/ProgressSteps";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -14,23 +17,42 @@ function checkFile(file: File): string | null {
   return null;
 }
 
-/** Drag-and-drop upload (F5). Sending the file to the backend is wired up in Phase 2. */
-export function UploadZone({ ready }: { ready: boolean }) {
+/** Drag-and-drop upload (F5). After upload the review page shows the remaining stages. */
+export function UploadZone({ meta, ready, onUploaded }: { meta: SessionMeta; ready: boolean; onUploaded: (id: number) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [percent, setPercent] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const uploading = percent !== null;
 
   const pick = (f: File | undefined) => {
-    if (!f) return;
+    if (!f || uploading) return;
     const error = checkFile(f);
     if (error) toast.error(error, { description: `Accepted: ${ACCEPTED.join(", ")} — up to 500 MB.` });
     else setFile(f);
   };
 
-  const start = () =>
-    toast.info("Processing arrives in Phase 2", {
-      description: "Upload, conversion and transcription are built next.",
-    });
+  const start = async () => {
+    if (!file) return;
+    setPercent(0);
+    try {
+      const session = await api.upload(meta, file, setPercent);
+      toast.success("Upload complete", { description: "Transcription has started." });
+      onUploaded(session.id);
+    } catch (e) {
+      toast.error((e as Error).message);
+      setPercent(null);
+    }
+  };
+
+  if (uploading) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">Please keep this tab open until the upload finishes.</p>
+        <ProgressSteps current="uploading" percent={percent} showInsights={false} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -87,7 +109,7 @@ export function UploadZone({ ready }: { ready: boolean }) {
       )}
 
       <Button size="lg" className="w-full" disabled={!ready || !file} onClick={start}>
-        Start processing
+        Upload and transcribe
       </Button>
       {!ready && (
         <p className="text-center text-sm text-muted-foreground">

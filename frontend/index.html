@@ -6,6 +6,12 @@
     <meta name="robots" content="noindex" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234A7666' stroke-width='2' stroke-linecap='round'><path d='M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3'/></svg>" />
     <title>Verbatim</title>
+    <script>
+      try {
+        var t = localStorage.getItem("verbatim-theme");
+        if (t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches)) document.documentElement.classList.add("dark");
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
