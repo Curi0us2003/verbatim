@@ -63,28 +63,36 @@ def complete(messages: list[dict]) -> str:
 
 
 def _ollama(messages: list[dict]) -> str:
-    try:
-        resp = httpx.post(
-            f"{settings.ollama_url.rstrip('/')}/api/chat",
-            json={
-                "model": settings.ollama_model,
-                "messages": messages,
-                "stream": False,
-                "format": "json",
-                "options": {"temperature": settings.llm_temperature, "num_ctx": settings.ollama_num_ctx},
-            },
-            timeout=600,
-        )
-    except httpx.HTTPError as exc:
-        raise LLMError(
-            "Ollama is not running. Install it from ollama.com, start it, and run "
-            f"`ollama pull {settings.ollama_model}`."
-        ) from exc
-    if resp.status_code == 404:
-        raise LLMError(f"The model {settings.ollama_model} is not downloaded. Run: ollama pull {settings.ollama_model}")
-    if resp.status_code >= 400:
-        raise LLMError(f"Ollama error {resp.status_code}: {resp.text[:300]}")
-    return resp.json()["message"]["content"]
+    for attempt in range(3):
+        try:
+            resp = httpx.post(
+                f"{settings.ollama_url.rstrip('/')}/api/chat",
+                json={
+                    "model": settings.ollama_model,
+                    "messages": messages,
+                    "stream": False,
+                    "format": "json",
+                    "options": {"temperature": settings.llm_temperature, "num_ctx": settings.ollama_num_ctx},
+                },
+                timeout=600,
+            )
+        except httpx.HTTPError as exc:
+            raise LLMError(
+                "Ollama is not running. Install it from ollama.com, start it, and run "
+                f"`ollama pull {settings.ollama_model}`."
+            ) from exc
+        if resp.status_code == 404:
+            raise LLMError(f"The model {settings.ollama_model} is not downloaded. Run: ollama pull {settings.ollama_model}")
+        # 5xx: Ollama's model runner can crash while loading onto a GPU that the speech models have
+        # only just released; it restarts by itself, so wait a moment and try again.
+        if resp.status_code >= 500 and attempt < 2:
+            log.warning("Ollama error %s, retrying: %s", resp.status_code, resp.text[:200])
+            time.sleep(3 * (attempt + 1))
+            continue
+        if resp.status_code >= 400:
+            raise LLMError(f"Ollama error {resp.status_code}: {resp.text[:300]}")
+        return resp.json()["message"]["content"]
+    raise LLMError("Ollama kept failing. Try Generate insights again.")
 
 
 def _groq(messages: list[dict]) -> str:
@@ -112,6 +120,21 @@ def _groq(messages: list[dict]) -> str:
             raise LLMError(f"Groq error {resp.status_code}: {resp.text[:300]}")
         return resp.json()["choices"][0]["message"]["content"]
     raise LLMError("Groq rate limit reached. Try again in a few minutes.")
+
+
+def unload() -> None:
+    """Ask Ollama to release the model from GPU memory now (it normally stays loaded for 5 minutes).
+    On a 6 GB GPU the AI model and the speech models do not fit at the same time."""
+    if settings.llm_engine != "ollama":
+        return
+    try:
+        httpx.post(
+            f"{settings.ollama_url.rstrip('/')}/api/generate",
+            json={"model": settings.ollama_model, "keep_alive": 0},
+            timeout=10,
+        )
+    except httpx.HTTPError:
+        pass  # Ollama not running: nothing to free
 
 
 def status() -> dict:

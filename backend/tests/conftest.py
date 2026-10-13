@@ -5,14 +5,28 @@ insights → export) run in seconds without downloading models. tests/test_real_
 exercises the real WhisperX engine when VERBATIM_REAL_MODELS=1.
 """
 
+import atexit
 import json
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
 from cryptography.fernet import Fernet
 
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="verbatim-test-")
+
+
+@atexit.register
+def _remove_test_data() -> None:
+    """Delete the throwaway data folder (close the database first: Windows locks open files)."""
+    try:
+        from app.models import engine
+
+        engine.dispose()
+    except Exception:
+        pass
+    shutil.rmtree(os.environ["DATA_DIR"], ignore_errors=True)
 os.environ["TRANSCRIBE_ENGINE"] = "local"
 os.environ["LLM_ENGINE"] = "ollama"
 os.environ["ENCRYPTION_KEY"] = Fernet.generate_key().decode()
@@ -101,7 +115,9 @@ class FakeLLM:
             return "```json\n" + json.dumps(SUMMARY) + "\n```"
         if self.calls == 1:
             return "Sure! Here is my reading: the client is stressed."  # not JSON → retry
-        return json.dumps(INSIGHT)
+        # Echo the reply being interpreted, so tests can check each card got its own exchange.
+        reply = messages[1]["content"].rsplit('Client: "', 1)[-1].rstrip('"')
+        return json.dumps({**INSIGHT, "evidence": [reply]})
 
 
 @pytest.fixture
@@ -113,6 +129,7 @@ def fake_engines(monkeypatch):
     monkeypatch.setattr(jobs, "transcribe", fake_transcribe)
     monkeypatch.setattr(jobs, "diarize", fake_diarize)
     monkeypatch.setattr(llm, "complete", fake_llm)
+    monkeypatch.setattr(llm, "unload", lambda: None)
     return fake_llm
 
 

@@ -51,12 +51,20 @@ def insight_user(context: list[tuple[str, str]], question: str, answer: str) -> 
     return f'Context (earlier):\n{earlier}\n\nCounsellor: "{question}"\nClient: "{answer}"'
 
 
+# Added to the user message (the spec's system prompt stays word for word): small models
+# otherwise write "No immediate risk..." into risk_flags, which raises a false alarm.
+RISK_NOTE = (
+    "\n\nOnly put items in risk_flags if the client mentions self-harm, suicide, abuse or harm to "
+    "others. Otherwise risk_flags must be an empty list []."
+)
+
+
 def summary_user_transcript(lines: list[str]) -> str:
-    return "Transcript:\n" + "\n".join(lines)
+    return "Transcript:\n" + "\n".join(lines) + RISK_NOTE
 
 
 def summary_user_insights(items: list[str]) -> str:
     return (
         "The full transcript is too long, so here are the per-exchange interpretations "
-        "in session order:\n" + "\n".join(items)
+        "in session order:\n" + "\n".join(items) + RISK_NOTE
     )

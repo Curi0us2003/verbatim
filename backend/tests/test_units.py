@@ -128,3 +128,23 @@ def test_fallback_speaker_guess_keeps_reflection_with_question():
     assert guess_speakers_without_diarization(segments) == [
         "SPEAKER_00", "SPEAKER_00", "SPEAKER_01", "SPEAKER_00", "SPEAKER_00", "SPEAKER_01",
     ]
+
+
+def test_filler_prompt_matches_language():
+    # An English prompt on Kannada audio made Whisper return only "Hmm." (found with real audio).
+    from app.pipeline.transcribe import prompt_for
+
+    assert prompt_for("en").startswith("Umm")
+    assert prompt_for("kn") and not any("a" <= c.lower() <= "z" for c in prompt_for("kn"))
+    assert prompt_for("hi") and not any("a" <= c.lower() <= "z" for c in prompt_for("hi"))
+    assert prompt_for("ta") is None and prompt_for(None) is None
+
+
+def test_summary_drops_non_risks():
+    from app.ai.insights import SessionSummary
+
+    s = SessionSummary(overview="x", risk_flags=[
+        "No immediate risk, but ongoing stress could be concerning", "None", "",
+        "Client mentioned thoughts of self-harm last week",
+    ])
+    assert s.risk_flags == ["Client mentioned thoughts of self-harm last week"]

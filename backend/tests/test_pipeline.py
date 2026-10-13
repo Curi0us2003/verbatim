@@ -108,6 +108,9 @@ def test_insights_summary_feedback_and_export(client, fake_engines):
     assert detail["status"] == "ready", detail["warning"]
     insight = detail["exchanges"][0]["insight_json"]
     assert insight["confidence"] == "high"  # normalised from "High"
+    # each card interprets its own exchange (regression: all cards once used the first one)
+    assert detail["exchanges"][0]["insight_json"]["evidence"][0].startswith("Um, honestly")
+    assert detail["exchanges"][1]["insight_json"]["evidence"][0].startswith("Mostly that I will fail")
     assert detail["summary"]["summary_json"]["main_themes"] == ["Exam stress"]
     assert detail["summary"]["model_used"].startswith("ollama:")
 

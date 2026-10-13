@@ -7,6 +7,7 @@ plus the language code that was used or detected.
 
 from __future__ import annotations
 
+import dataclasses
 import gc
 import logging
 import math
@@ -28,7 +29,17 @@ log = logging.getLogger("verbatim.transcribe")
 Progress = Callable[[float], None]  # 0–100 within the current stage
 
 # F1: a disfluent prompt nudges Whisper to keep fillers instead of cleaning speech up.
-INITIAL_PROMPT = "Umm, so, I mean... yeah. Hmm."
+# It must be in the session's language: tested on Kannada audio, the English prompt made Whisper
+# output only "Hmm." for the whole recording. Languages without a prompt get none.
+INITIAL_PROMPTS = {
+    "en": "Umm, so, I mean... yeah. Hmm.",
+    "hi": "अं, तो, मतलब... हाँ। हम्म।",
+    "kn": "ಅಂ, ಅಂದರೆ... ಹೌದು. ಹ್ಮ್.",
+}
+
+
+def prompt_for(language: str | None) -> str | None:
+    return INITIAL_PROMPTS.get(language or "")
 
 # Phrases Whisper is known to invent during silence or background noise.
 HALLUCINATIONS = {
@@ -176,6 +187,31 @@ def estimate_words(text: str, start: float, end: float, score: float | None = No
 # ---------------------------------------------------------------------------
 
 
+def detect_language(model, audio: np.ndarray) -> str:
+    """Pick the session language among AUTO_LANGUAGES (default en, hi, kn).
+
+    Whisper alone often labels spoken Hindi as Urdu and then writes Urdu script, and it only listens
+    to the first 30 s. Here three 30-second windows (start, a third in, two thirds in) are scored
+    and only the app's languages are considered, which also helps sessions that open in English.
+    """
+    from whisperx.audio import N_SAMPLES, log_mel_spectrogram
+
+    allowed = [c.strip() for c in settings.auto_languages.split(",") if c.strip()]
+    n_mels = model.model.feat_kwargs.get("feature_size") or 80
+    starts = sorted({0, len(audio) // 3, 2 * len(audio) // 3}) if len(audio) > 3 * N_SAMPLES else [0]
+    totals: dict[str, float] = {}
+    for start in starts:
+        window = audio[start : start + N_SAMPLES]
+        mel = log_mel_spectrogram(window, n_mels=n_mels, padding=max(0, N_SAMPLES - len(window)))
+        for token, prob in model.model.model.detect_language(model.model.encode(mel))[0]:
+            code = token[2:-2]
+            if not allowed or code in allowed:
+                totals[code] = totals.get(code, 0.0) + prob
+    language = max(totals, key=totals.get) if totals else "en"
+    log.info("Detected language %s (scores %s)", language, {k: round(v, 2) for k, v in totals.items()})
+    return language
+
+
 def transcribe_local(audio: np.ndarray, language: str | None, progress: Progress) -> tuple[list[dict], str]:
     prepare_torch()
     try:
@@ -195,7 +231,7 @@ def transcribe_local(audio: np.ndarray, language: str | None, progress: Progress
         compute_type=compute_type,
         language=language,
         asr_options={
-            "initial_prompt": INITIAL_PROMPT,
+            "initial_prompt": prompt_for(language),
             "condition_on_previous_text": False,  # avoids repetition loops in noisy audio
             "no_speech_threshold": 0.6,
         },
@@ -203,6 +239,10 @@ def transcribe_local(audio: np.ndarray, language: str | None, progress: Progress
         download_root=model_dir("whisper"),
         threads=max(1, (os.cpu_count() or 4) // 2),
     )
+    if language is None:
+        # Auto-detect first, so the filler prompt matches the language.
+        language = detect_language(model, audio)
+        model.options = dataclasses.replace(model.options, initial_prompt=prompt_for(language))
     progress(10)
 
     batch = max(1, settings.whisper_batch_size)
@@ -270,8 +310,9 @@ def transcribe_groq(wav: Path, duration: float, language: str | None, progress: 
                 "response_format": "verbose_json",
                 "timestamp_granularities[]": ["word", "segment"],
                 "temperature": "0",
-                "prompt": INITIAL_PROMPT,
             }
+            if prompt_for(language):
+                data["prompt"] = prompt_for(language)
             if language:
                 data["language"] = language
             body = _groq_post(client, piece, data)

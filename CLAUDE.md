@@ -16,8 +16,14 @@ Counselling session verbatim app. **SPEC.md is the source of truth**; re-read it
 - Verified end-to-end in Edge via Playwright (scratch script, not in repo): setup password → upload → real WhisperX
   large-v3 on the GPU → review/playback/Space/search/edit/menu/dark mode; live recording with fake mic → 30 s
   chunks → transcript; settings/system check. Real-model pytest: word-perfect transcript of the sample.
-- Not verifiable here: pyannote diarization (needs user's HF token), Ollama insights (Ollama not installed),
-  Groq (no key). Those paths are covered by fake-engine tests only.
+- 2026-10-14 follow-up ("complete the incomplete work"): Ollama 0.40.3 installed to D:\Verbatim\ollama, user env
+  OLLAMA_MODELS=D:\Verbatim\ollama-models, qwen2.5:7b pulled; real insights + summary verified in the browser.
+  Real Hindi/Kannada clips (HF datasets, deleted afterwards) verified. Bugs found and fixed: English filler prompt
+  wiped out non-English speech; auto-detect chose Urdu for Hindi; every insight card used the first exchange
+  (expired SQLModel rows compare equal → list.index); "No immediate risk" in summary raised a false risk banner;
+  Ollama runner crash right after transcription (now retried + model unloaded around GPU jobs); tests left
+  data folders in C: Temp.
+- Still not verifiable here: pyannote diarization (needs user's HF token) and Groq (no key).
 
 ## User's machine
 - Windows 11, NVIDIA RTX 3050 Laptop GPU (6 GB VRAM), Python 3.13 (WhisperX 3.8.6 supports 3.10–3.13).
@@ -26,7 +32,7 @@ Counselling session verbatim app. **SPEC.md is the source of truth**; re-read it
   When running pip, set `TMP`/`TEMP` to a D: folder (setup.mjs does this).
 - Project itself is inside OneDrive (code only; data is on D:). OneDrive occasionally locks files → retry edits.
 - torch 2.8.0+cu128 + whisperx 3.8.6 + ctranslate2 4.8 work on the GPU (int8_float16 auto-selected for 6 GB).
-- Ollama not installed yet; HF token not set yet.
+- Ollama installed on D: (see status). HF token not set yet.
 
 ## How to run
 - `npm install` then `npm run setup` (once): .env (+ generated ENCRYPTION_KEY), venv (VENV_DIR), core + speech
@@ -71,4 +77,7 @@ Counselling session verbatim app. **SPEC.md is the source of truth**; re-read it
 - PDF export via browser print (renders Hindi/Kannada; WeasyPrint needs GTK on Windows).
 - Buttons use sage #4A7666 (spec #5B8C7A fails the spec's own 4.5:1 contrast with white text).
 - Without HF token: transcript still produced, speakers guessed from questions, warning banner shown.
-- Kannada has no default word-alignment model → evenly spread word times, no confidence underline (ALIGN_MODEL_KN option).
+- Kannada has no usable free word-alignment model (vakyansh/addy88 tested: all words squeezed into the first
+  seconds) → evenly spread word times, no confidence underline (ALIGN_MODEL_KN option kept).
+- Filler prompt is per language (en/hi/kn); auto-detect restricted to AUTO_LANGUAGES over 3 windows.
+- Summary user message adds a note to leave risk_flags empty; non-risk entries are filtered (system prompt unchanged).

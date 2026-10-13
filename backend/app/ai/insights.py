@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable
 from typing import Literal
 
@@ -43,6 +44,13 @@ class Insight(BaseModel):
         return str(v).strip().lower() if v is not None else "low"
 
 
+# Small models sometimes write "No immediate risk…" into risk_flags, which would raise a false alarm.
+NOT_A_RISK = re.compile(
+    r"^\s*(no|none|nil|n/?a|not applicable|nothing)\b|\bno (immediate |apparent |evident |significant )?risks?\b",
+    re.IGNORECASE,
+)
+
+
 class SessionSummary(BaseModel):
     overview: str
     main_themes: list[str] = []
@@ -52,6 +60,11 @@ class SessionSummary(BaseModel):
     strengths_noticed: list[str] = []
     topics_for_next_session: list[str] = []
     risk_flags: list[str] = []
+
+    @field_validator("risk_flags")
+    @classmethod
+    def _real_risks_only(cls, v: list[str]) -> list[str]:
+        return [r for r in v if r.strip() and not NOT_A_RISK.search(r)]
 
 
 def label_speakers(turns: list[dict]) -> str:
@@ -85,9 +98,12 @@ def generate_for_session(session_id: int, progress: Callable[[float], None], onl
 
         pairs = [(texts(e.counsellor_turn_ids), texts(e.client_turn_ids)) for e in exchanges]
         failures = 0
-        todo = [e for e in exchanges if e.client_turn_ids and not (only_missing and e.insight_json and "client_meaning" in e.insight_json)]
-        for n, ex in enumerate(todo):
-            i = exchanges.index(ex)
+        # Indexes are taken up front: rows expire after each commit and must not be compared later.
+        todo = [
+            (i, e) for i, e in enumerate(exchanges)
+            if e.client_turn_ids and not (only_missing and e.insight_json and "client_meaning" in e.insight_json)
+        ]
+        for n, (i, ex) in enumerate(todo):
             question, answer = pairs[i]
             context = [(_clip(q, 500), _clip(a, 700)) for q, a in pairs[max(0, i - 2) : i]]
             user = prompts.insight_user(

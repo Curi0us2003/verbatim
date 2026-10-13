@@ -13,8 +13,12 @@ The full design is in [SPEC.md](SPEC.md). Build status and notes for developers 
 | --- | --- | --- |
 | Node.js 20+ | runs the app | https://nodejs.org |
 | Python 3.10–3.13 | speech models and server | https://www.python.org/downloads/ (tick "Add to PATH") |
-| Ollama | local AI insights | https://ollama.com → install, then run `ollama pull qwen2.5:7b` |
+| Ollama | local AI insights | https://ollama.com → install, then run `ollama pull qwen2.5:7b` (see note below) |
 | ffmpeg | audio conversion | optional: a copy is installed automatically; or `winget install Gyan.FFmpeg` |
+
+**Ollama on another drive:** before installing, set the Windows user variable `OLLAMA_MODELS` to a folder on a
+drive with space (e.g. `D:\Verbatim\ollama-models`), and install with
+`OllamaSetup.exe /DIR="D:\Verbatim\ollama"`. On this computer that is already done.
 
 You need about **10 GB of free disk space**: about 4 GB for the speech software, about 4 GB for the speech
 models, and about 5 GB for the Ollama model. If your system drive is full, use another drive (see step 2).
@@ -73,6 +77,17 @@ session takes a few minutes on a GPU.
 - Voice-activity detection skips stretches that are only noise, and a filter removes phrases Whisper is known to
   invent from noise (for example "Thank you for watching").
 - If a transcript came out poorly, use **⋯ → Re-process audio…** to run it again with stronger noise reduction.
+
+## Languages
+
+Choose English, Hindi or Kannada per session, or *Auto-detect*. Auto-detect listens at three points in the
+recording and only chooses between the languages in `AUTO_LANGUAGES` (default `en,hi,kn`), because Whisper on
+its own often mistakes spoken Hindi for Urdu and writes Urdu script.
+
+- **English and Hindi:** word-level timings and "unclear word" underlines.
+- **Kannada:** the transcript works, but no reliable free word-alignment model exists, so word times are spread
+  evenly across each sentence and unclear words are not underlined.
+- **Mixed speech (Hinglish and similar):** the whole session is transcribed in one language. Pick the main one.
 
 ## Cloud mode (optional, not private)
 

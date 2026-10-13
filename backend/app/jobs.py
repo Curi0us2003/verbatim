@@ -19,6 +19,7 @@ from sqlmodel import delete, select
 
 from . import prefs, storage
 from .ai import insights as ai_insights
+from .ai import llm
 from .ai.llm import LLMError
 from .models import PROCESSING, Exchange, Role, Session, SessionStatus, Summary, Turn, engine, utcnow
 from .pipeline import audio as audio_mod
@@ -139,6 +140,7 @@ def _process(session_id: int, progress) -> None:
         raise PipelineError("The recording file is missing from disk.")
 
     _set_status(session_id, SessionStatus.converting, error=None, warning=None)
+    llm.unload()  # free GPU memory for the speech models
     progress(5)
     sdir = storage.session_dir(session_id)
     with tempfile.TemporaryDirectory(dir=sdir, prefix="work-") as tmp:
@@ -232,6 +234,7 @@ def insights_job(session_id: int, progress) -> None:
     except Exception as exc:
         log.exception("Insights failed for session %s", session_id)
         warning = f"AI insights could not be generated: {exc}"
+    llm.unload()  # give the GPU back to the speech models
     # Keep a speaker-separation warning; replace any older AI warning.
     keep = previous_warning if previous_warning and "Speaker separation" in previous_warning else None
     combined = " ".join(w for w in (keep, warning) if w) or None

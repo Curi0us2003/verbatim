@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     whisper_batch_size: int = 8
     vad_method: Literal["pyannote", "silero"] = "pyannote"
     align_model_kn: str = ""  # optional wav2vec2 model for Kannada word timings
+    auto_languages: str = "en,hi,kn"  # "Auto-detect" chooses among these
 
     # Background noise: default for new sessions (each session can override)
     noise_reduction: NoiseLevel = "light"
