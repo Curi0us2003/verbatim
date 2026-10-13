@@ -48,7 +48,9 @@ def convert_to_wav(src: Path, dst: Path, noise: str = "light") -> None:
     cmd = [ffmpeg_path(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-ac", "1",
            "-ar", str(SAMPLE_RATE)]
     if filters:
-        cmd += ["-af", filters]
+        # The denoiser learns the noise from the first moments; if speech starts at 0:00 it would
+        # eat into the first word. A 1 s silent lead-in (trimmed off again) keeps timings unchanged.
+        cmd += ["-af", f"adelay=1000:all=1,{filters},atrim=start=1,asetpts=PTS-STARTPTS"]
     cmd += ["-c:a", "pcm_s16le", str(dst)]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0 or not dst.exists() or dst.stat().st_size <= 44:

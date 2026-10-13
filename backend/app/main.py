@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
+import os
+import sys
 import logging
 import re
 import shutil
@@ -69,6 +71,13 @@ async def lifespan(_app: FastAPI):
     prefs.load()
     worker.start()
     yield
+    # Once the speech models have used the GPU, Python on Windows can hang while exiting
+    # (CUDA libraries never finish unloading), which blocks Ctrl+C and auto-reload.
+    # Everything is already saved in the database at this point, so end the process directly.
+    if "ctranslate2" in sys.modules or "pyannote.audio" in sys.modules:
+        logging.getLogger("verbatim").info("Speech models were loaded; exiting immediately.")
+        logging.shutdown()
+        os._exit(0)
 
 
 app = FastAPI(title="Verbatim", lifespan=lifespan)

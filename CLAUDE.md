@@ -14,7 +14,8 @@ Counselling session verbatim app. **SPEC.md is the source of truth**; re-read it
 ## Current status
 - Phases 1–7 built. Backend: 31 pytest tests (fake engines) + 1 real-WhisperX test (`VERBATIM_REAL_MODELS=1`).
 - Verified end-to-end in Edge via Playwright (scratch script, not in repo): setup password → upload → real WhisperX
-  (small, GPU) → review/playback/search/edit; live recording with fake mic → 30 s chunks → transcript.
+  large-v3 on the GPU → review/playback/Space/search/edit/menu/dark mode; live recording with fake mic → 30 s
+  chunks → transcript; settings/system check. Real-model pytest: word-perfect transcript of the sample.
 - Not verifiable here: pyannote diarization (needs user's HF token), Ollama insights (Ollama not installed),
   Groq (no key). Those paths are covered by fake-engine tests only.
 
@@ -30,7 +31,9 @@ Counselling session verbatim app. **SPEC.md is the source of truth**; re-read it
 ## How to run
 - `npm install` then `npm run setup` (once): .env (+ generated ENCRYPTION_KEY), venv (VENV_DIR), core + speech
   packages (CUDA torch if nvidia-smi found), frontend packages. `npm run setup -- --core` skips speech packages.
-- `npm run dev`: FastAPI on 127.0.0.1:8000 + Vite on 127.0.0.1:5173 (proxies `/api`).
+- `npm run dev`: FastAPI on 127.0.0.1:8000 + Vite on 127.0.0.1:5173 (proxies `/api`). No auto-reload on purpose
+  (OneDrive touches files → reload mid-transcription). `npm run dev:watch` = with backend auto-reload for development.
+- After speech models load, lifespan shutdown calls os._exit (CUDA libs hang Python exit on Windows).
 - `npm test`: backend pytest. `npx tsc -b` in frontend: type-check.
 - Stopping background dev runs from Claude: TaskStop leaves orphan uvicorn/vite processes — kill the whole tree
   (match `concurrently.js|uvicorn app.main:app|vite.js|multiprocessing.spawn`). For UI tests use
@@ -54,7 +57,8 @@ Counselling session verbatim app. **SPEC.md is the source of truth**; re-read it
 ## Noise handling
 - Recording: getUserMedia noiseSuppression/echoCancellation/autoGainControl (toggle), mic test measures room noise
   floor and suggests "strong".
-- Every file: ffmpeg filter per session (`off|light|strong`: highpass/lowpass, afftdn, dynaudnorm m=4), default in
+- Every file: ffmpeg filter per session (`off|light|strong`: highpass/lowpass, afftdn, dynaudnorm m=4) with a 1 s
+  silent lead-in (trimmed after) so afftdn doesn't eat a first word at 0:00; default in
   Settings/.env `NOISE_REDUCTION`. Test `test_noise_reduction_improves_speech_to_noise` checks SNR gain.
 - Transcription: VAD, condition_on_previous_text=False, hallucination phrase filter; Re-process with another level.
 
