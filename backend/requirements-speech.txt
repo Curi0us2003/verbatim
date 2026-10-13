@@ -1,0 +1,6 @@
+# Local transcription + speaker separation (about 4 GB with GPU PyTorch).
+# Install PyTorch first from the matching index, e.g. for NVIDIA GPUs:
+#   pip install torch==2.8.0 torchaudio==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu128
+# or for CPU only:
+#   pip install torch==2.8.0 torchaudio==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cpu
+whisperx==3.8.6

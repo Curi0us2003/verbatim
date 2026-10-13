@@ -1,14 +1,18 @@
-# Phase 1 — web server and database
+# Core: web server, database, audio conversion, privacy, export
 fastapi>=0.115
 uvicorn[standard]>=0.32
 sqlmodel>=0.0.22
 pydantic-settings>=2.6
+python-multipart>=0.0.12
+httpx>=0.27
+numpy>=2.1
+imageio-ffmpeg>=0.5     # bundled ffmpeg, used when ffmpeg is not installed system-wide
+bcrypt>=4.2             # app password
+cryptography>=43        # audio encryption at rest (Fernet)
+python-docx>=1.1        # Word export
 
 # Tests
 pytest>=8.3
-httpx>=0.27
 
-# Added in later phases:
-#   Phase 2: python-multipart, whisperx, groq
-#   Phase 6: (httpx is reused for Ollama / Groq)
-#   Phase 7: bcrypt, cryptography, python-docx, weasyprint
+# Local speech models (WhisperX + pyannote) are in requirements-speech.txt;
+# `npm run setup` installs them with the right PyTorch build for your GPU or CPU.

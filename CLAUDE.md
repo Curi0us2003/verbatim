@@ -11,8 +11,9 @@ Counselling session verbatim app. **SPEC.md is the source of truth**; re-read it
 - End of each phase: a short test checklist, a git commit, and an update to this file.
 
 ## Current status
-- **Phase 1 — Skeleton: done** (awaiting user confirmation).
-- Next: Phase 2 — upload + transcription.
+- User changed plan (2026-10-14): build ALL remaining phases in one run, no stopping between phases.
+- Phase 1 — Skeleton: done.
+- Backend for Phases 2–7: done and tested with fake engines (30 pytest tests). Frontend for Phases 2–7: in progress.
 
 ## User's machine
 - Windows 11, NVIDIA RTX 3050 Laptop GPU (6 GB VRAM).
