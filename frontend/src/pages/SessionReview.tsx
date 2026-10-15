@@ -13,11 +13,22 @@ import {
   Search,
   Sparkles,
   Trash2,
+  AudioLines,
+  HelpCircle,
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { api } from "@/api";
-import { isInsight, type Exchange, type SessionDetail, type SessionStatus, type StatusInfo, type SummaryData, type Turn } from "@/types";
+import {
+  isInsight,
+  SPEAKER_UNSURE_BELOW,
+  type Exchange,
+  type SessionDetail,
+  type SessionStatus,
+  type StatusInfo,
+  type SummaryData,
+  type Turn,
+} from "@/types";
 import { AudioBar } from "@/components/AudioBar";
 import { ProgressSteps } from "@/components/ProgressSteps";
 import { DeleteDialog, RedactDialog, ReprocessDialog, SplitDialog } from "@/components/SessionDialogs";
@@ -205,7 +216,21 @@ export function SessionReviewPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <SessionMenu onSelect={setDialog} canReprocess={!session.audio_deleted_at} disabled={session.status === "insights"} />
+            <SessionMenu
+              onSelect={setDialog}
+              canReprocess={!session.audio_deleted_at}
+              disabled={session.status === "insights"}
+              onLearnVoice={
+                session.has_audio
+                  ? () =>
+                      run(() => api.learnVoice(session.id), (v) =>
+                        toast.success("Learned your voice from this session", {
+                          description: `Your voiceprint now uses ${Math.round(v.seconds ?? 0)} seconds of your speech. New sessions will recognise you as the counsellor.`,
+                        }),
+                      )
+                  : undefined
+              }
+            />
           </div>
         )}
       </div>
@@ -324,6 +349,8 @@ export function SessionReviewPage() {
         </div>
       )}
 
+      <VoiceCheckBar session={session} />
+
       <Tabs defaultValue="transcript">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <TabsList>
@@ -426,7 +453,9 @@ export function SessionReviewPage() {
   );
 }
 
-function SessionMenu({ onSelect, canReprocess, disabled }: { onSelect: (d: "redact" | "reprocess" | "delete") => void; canReprocess: boolean; disabled: boolean }) {
+function SessionMenu({
+  onSelect, canReprocess, disabled, onLearnVoice,
+}: { onSelect: (d: "redact" | "reprocess" | "delete") => void; canReprocess: boolean; disabled: boolean; onLearnVoice?: () => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -435,6 +464,11 @@ function SessionMenu({ onSelect, canReprocess, disabled }: { onSelect: (d: "reda
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => onSelect("redact")}><EyeOff /> Redact names…</DropdownMenuItem>
         {canReprocess && <DropdownMenuItem onSelect={() => onSelect("reprocess")}><RefreshCw /> Re-process audio…</DropdownMenuItem>}
+        {onLearnVoice && (
+          <DropdownMenuItem onSelect={onLearnVoice} title="Uses the turns marked Counsellor, so check the roles first">
+            <AudioLines /> Learn my voice from this session
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem destructive onSelect={() => onSelect("delete")}><Trash2 /> Delete session…</DropdownMenuItem>
       </DropdownMenuContent>
@@ -502,6 +536,47 @@ function ReviewSkeleton() {
           <Skeleton className="hidden h-48 rounded-xl lg:block" />
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Voice analysis summary: what the second layer did, and a shortcut to turns it wants checked. */
+function VoiceCheckBar({ session }: { session: SessionDetail }) {
+  const [next, setNext] = useState(0);
+  const vc = session.voice_check;
+  if (!vc) return null;
+  const unsure = session.turns.filter((t) => t.speaker_confidence != null && t.speaker_confidence < SPEAKER_UNSURE_BELOW);
+  if (!vc.used) {
+    return vc.reason || vc.error ? (
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <AudioLines className="h-4 w-4" aria-hidden /> Voice check not used: {vc.reason ?? "it could not run on this recording"}.
+      </p>
+    ) : null;
+  }
+  const parts = [vc.diarized ? "speakers double-checked by voice" : "speakers told apart by voice"];
+  if (vc.corrected) parts.push(`${vc.corrected} part${vc.corrected > 1 ? "s" : ""} corrected`);
+  if (vc.counsellor_by === "voiceprint") parts.push("you were recognised by your voiceprint");
+  const goNext = () => {
+    const turn = unsure[next % unsure.length];
+    document.querySelector(`[data-turn-id="${turn.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setNext((n) => n + 1);
+  };
+  return (
+    <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border bg-card px-4 py-2.5 text-sm">
+      <AudioLines className="h-4 w-4 shrink-0 text-sage" aria-hidden />
+      <span className="min-w-0 flex-1">
+        <span className="font-medium">Voice check:</span> {parts.join(" · ")}.{" "}
+        {unsure.length ? (
+          <span className="text-client-ink">{unsure.length} turn{unsure.length > 1 ? "s" : ""} to check.</span>
+        ) : (
+          <span className="text-muted-foreground">Nothing needs checking.</span>
+        )}
+      </span>
+      {unsure.length > 0 && (
+        <Button variant="outline" size="sm" onClick={goNext}>
+          <HelpCircle /> Next to check
+        </Button>
+      )}
     </div>
   );
 }

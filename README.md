@@ -68,6 +68,28 @@ session takes a few minutes on a GPU.
 
 **Settings → System check** shows what is ready and what still needs setting up.
 
+## Who said what: two layers
+
+1. **Speaker separation (pyannote)** splits the recording into two speakers. It needs the free Hugging
+   Face token (step 4).
+2. **Voice analysis** compares short "voice fingerprints" (about every half second) and groups them into the
+   two voices. It needs no token and runs on this computer.
+   - With the token, it double-checks pyannote: clear mistakes are corrected, and unclear turns get a
+     **Check speaker** flag. The *Next to check* button on the review page jumps between them.
+   - Without the token, voice analysis separates the speakers on its own.
+3. **Your voiceprint (optional, recommended):** in **Settings → Your voice**, read a short passage for 20 seconds.
+   From then on the counsellor is recognised by voice in every session, even when the client speaks first.
+   Only a fingerprint (a list of numbers) is stored, encrypted. The recording is deleted straight away. You
+   can also use **⋯ → Learn my voice from this session** on a session whose roles are correct.
+
+In tests with real recorded voices (same-gender pairs, with and without background noise), guessing from
+questions put 54–90% of speech with the right person. Voice analysis got 99–100%, and the voiceprint picked out
+the counsellor 10 times out of 10. Very similar voices, people talking over each other and very short replies
+("Mm.") are still hard, so always glance over turns flagged **Check speaker**.
+
+To re-check older sessions with voice analysis, open them and use **⋯ → Re-process audio…**. This replaces the
+transcript, including your edits.
+
 ## Background noise
 
 - **While recording**, the browser's noise suppression and echo cancellation are on by default. *Test microphone*

@@ -23,6 +23,12 @@ Counselling session verbatim app. **SPEC.md is the source of truth**; re-read it
   (expired SQLModel rows compare equal → list.index); "No immediate risk" in summary raised a false risk banner;
   Ollama runner crash right after transcription (now retried + model unloaded around GPU jobs); tests left
   data folders in C: Temp.
+- 2026-10-15: user reported speakers not distinguished in recordings (HF token still not set → question guess only).
+  Added voice analysis (pipeline/voices.py) as a second who-said-what layer + optional counsellor voiceprint.
+  Evaluated on LibriSpeech mock conversations (scratch scripts, data deleted): question guess 54-90% → voice-only
+  99-100%; 20%-faulty diarizer corrected to 100%; voiceprint picked counsellor 10/10; browser test with
+  client-speaks-first: roles 0% → 100% with voiceprint.
+- User has real sessions in D:/Verbatim/data (2 so far): never touch them; UI tests use D:/Verbatim/test-data.
 - Still not verifiable here: pyannote diarization (needs user's HF token) and Groq (no key).
 
 ## User's machine
@@ -54,6 +60,12 @@ Counselling session verbatim app. **SPEC.md is the source of truth**; re-read it
 - `pipeline/`: `audio.py` (ffmpeg or imageio-ffmpeg; noise filters), `transcribe.py` (WhisperX/Groq, hallucination
   filter, device/compute auto), `diarize.py` (pyannote via whisperx, num_speakers=2), `turns.py` (merge, pauses,
   exchanges, regroup keeping insights), `roles.py` (question heuristic, LLM fallback, no-diarization guess).
+- `pipeline/voices.py`: sliding 1.5 s/0.5 s speaker embeddings (pyannote/wespeaker-voxceleb-resnet34-LM, ungated),
+  two-voice clustering (agglomerative vs k-means, best balanced split, windows ≥70% speech), per-word scores +
+  Viterbi smoothing; diarized mode corrects runs with margin ≥0.10 over ≥0.8 s, flags unclear, keeps pyannote
+  if overall agreement <0.7; voiceprint (encrypted JSON in DATA_DIR) sets counsellor. Words get spk_conf;
+  Turn.speaker_confidence = min over turn (smoothed); <0.65 → "Check speaker". Routes: /voice, /voice/enroll,
+  /voice/learn/{id}. VOICE_CHECK / VOICE_MODEL in .env; tests disable it unless using `fake_voices` fixture.
 - `ai/`: `llm.py` (Ollama/Groq, JSON extract, 1 retry), `prompts.py` (SPEC prompts verbatim), `insights.py`.
 - `prefs.py` settings.json in DATA_DIR (password hash, cookie secret, retention days, auto insights, default noise).
 - `export.py` TXT / DOCX (python-docx) / PDF = print-ready HTML that opens the browser print dialog.
@@ -81,3 +93,5 @@ Counselling session verbatim app. **SPEC.md is the source of truth**; re-read it
   seconds) → evenly spread word times, no confidence underline (ALIGN_MODEL_KN option kept).
 - Filler prompt is per language (en/hi/kn); auto-detect restricted to AUTO_LANGUAGES over 3 windows.
 - Summary user message adds a note to leave risk_flags empty; non-risk entries are filtered (system prompt unchanged).
+- Voice analysis layer + counsellor voiceprint are additions beyond SPEC (user request 2026-10-15). Extra fields:
+  Turn.speaker_confidence, Session.voice_check.

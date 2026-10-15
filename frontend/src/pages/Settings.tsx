@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { VoiceEnrollCard } from "@/components/VoiceEnrollCard";
 import { NOISE_OPTIONS } from "@/lib/utils";
 
 export function SettingsPage() {
@@ -108,6 +109,8 @@ export function SettingsPage() {
         </>
       )}
 
+      <VoiceEnrollCard />
+
       <PasswordCard />
 
       <Card>
@@ -126,7 +129,8 @@ export function SettingsPage() {
                 label={health.transcribe_engine === "groq" ? "Transcription: Groq cloud" : `Transcription: WhisperX ${health.checks.whisper_model} (local)`}
                 fix="Run npm run setup to install the speech models."
               />
-              <Check ok={health.checks.hf_token} label="Speaker separation (Hugging Face token)" fix="Add HF_TOKEN to .env — see README, step 4." />
+              <Check ok={health.checks.hf_token} label="Speaker separation (Hugging Face token)" fix="Add HF_TOKEN to .env — see README, step 4. Voice analysis still separates speakers without it." />
+              <Check ok={health.checks.voice_check} label="Voice analysis (second check of who said what)" fix="Set VOICE_CHECK=true in .env." />
               <Check
                 ok={!!llm?.ready}
                 label={`AI insights: ${health.checks.llm_model} (${health.llm_engine === "groq" ? "Groq cloud" : "Ollama, local"})`}

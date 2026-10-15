@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { ArrowLeftRight, MoreHorizontal, NotebookPen, Pencil, Scissors, UserRound } from "lucide-react";
-import type { Turn } from "@/types";
+import { ArrowLeftRight, HelpCircle, MoreHorizontal, NotebookPen, Pencil, Scissors, UserRound } from "lucide-react";
+import { SPEAKER_UNSURE_BELOW, type Turn } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -66,6 +66,15 @@ export function TurnBubble({
             {formatTime(turn.start)}
           </button>
           {turn.edited && <span className="font-normal normal-case tracking-normal text-muted-foreground">· edited</span>}
+          {turn.speaker_confidence != null && turn.speaker_confidence < SPEAKER_UNSURE_BELOW && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-client-border/70 bg-card px-2 py-0.5 font-medium normal-case tracking-normal text-client-ink"
+              title="Voice analysis isn't sure who said this. Play it, and if it's the other person use ⋯ → Mark as … (or Split turn if both spoke)."
+              data-check-speaker
+            >
+              <HelpCircle className="h-3 w-3" aria-hidden /> Check speaker
+            </span>
+          )}
           {!readOnly && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

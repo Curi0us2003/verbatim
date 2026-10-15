@@ -30,6 +30,29 @@ export interface Turn {
   text: string;
   words_json: Word[];
   edited: boolean;
+  /** Voice analysis: 0.5 = could be either speaker, 1.0 = certain or confirmed. null = not checked. */
+  speaker_confidence: number | null;
+}
+
+/** Below this, a turn shows a "check speaker" flag (matches UNSURE_BELOW in voices.py). */
+export const SPEAKER_UNSURE_BELOW = 0.65;
+
+export interface VoiceCheck {
+  used: boolean;
+  diarized: boolean;
+  corrected: number;
+  uncertain_turns?: number;
+  counsellor_by?: string;
+  counsellor_label?: string;
+  reason?: string;
+  error?: string;
+}
+
+export interface VoiceInfo {
+  enrolled: boolean;
+  seconds?: number;
+  source?: string;
+  updated_at?: string;
 }
 
 export interface Insight {
@@ -99,6 +122,7 @@ export interface SessionRecord {
   noise_reduction: NoiseLevel;
   has_audio: boolean;
   audio_deleted_at: string | null;
+  voice_check: VoiceCheck | null;
 }
 
 export interface SessionDetail extends SessionRecord {
@@ -124,6 +148,7 @@ export interface Health {
     whisperx: boolean;
     hf_token: boolean;
     encryption: boolean;
+    voice_check: boolean;
     whisper_model: string;
     llm_model: string;
   };

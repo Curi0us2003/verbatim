@@ -9,6 +9,7 @@ import type {
   SessionMeta,
   SessionRecord,
   StatusInfo,
+  VoiceInfo,
 } from "./types";
 
 export class ApiError extends Error {
@@ -131,6 +132,15 @@ export const api = {
     id: number,
     changes: { counsellor_feedback?: "agree" | "disagree"; clear_feedback?: boolean; counsellor_note?: string },
   ) => request<Exchange>(`/exchanges/${id}`, json("PATCH", changes)),
+
+  voice: () => request<VoiceInfo>("/voice"),
+  enrollVoice: (blob: Blob, ext: string) => {
+    const form = new FormData();
+    form.append("file", blob, `voice${ext}`);
+    return request<VoiceInfo>("/voice/enroll", { method: "POST", body: form });
+  },
+  learnVoice: (sessionId: number) => request<VoiceInfo>(`/voice/learn/${sessionId}`, json("POST")),
+  deleteVoice: () => request<VoiceInfo>("/voice", json("DELETE")),
 
   audioUrl: (id: number) => `/api/sessions/${id}/audio`,
   exportUrl: (id: number, format: "pdf" | "docx" | "txt") => `/api/sessions/${id}/export?format=${format}`,
