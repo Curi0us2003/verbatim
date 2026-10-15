@@ -18,6 +18,7 @@ from sqlmodel import Session as DBSession
 from sqlmodel import delete, select
 
 from . import prefs, storage
+from .config import settings
 from .ai import insights as ai_insights
 from .ai import llm
 from .ai.llm import LLMError
@@ -27,6 +28,7 @@ from .pipeline.diarize import DiarizationUnavailable, diarize
 from .pipeline.roles import detect_counsellor, guess_speakers_without_diarization
 from .pipeline.transcribe import transcribe
 from .pipeline.turns import build_turns, rebuild_exchanges
+from .pipeline.voices import UNSURE_BELOW, check_speakers
 
 log = logging.getLogger("verbatim.jobs")
 
@@ -176,27 +178,52 @@ def _process(session_id: int, progress) -> None:
     progress(0)
     warning = None
     try:
-        segments = diarize(audio, segments, progress)
+        segments = diarize(audio, segments, lambda p: progress(p * 0.6))
         guessed = False
     except DiarizationUnavailable as exc:
-        # Still give a usable transcript: guess speakers from questions, the counsellor can fix them.
+        # Still give a usable transcript: guess speakers from questions (voice analysis below
+        # replaces this guess when it can tell the two voices apart).
         warning = str(exc)
         guessed = True
         for seg, label in zip(segments, guess_speakers_without_diarization(segments)):
             seg["speaker"] = label
             for w in seg["words"]:
                 w.pop("speaker", None)
+
+    # Second layer: compare voice fingerprints to confirm, correct or flag who said what.
+    voice_report: dict | None = None
+    if settings.voice_check:
+        try:
+            segments, voice_report = check_speakers(audio, segments, diarized=not guessed,
+                                                    progress=lambda p: progress(60 + p * 0.4))
+        except Exception as exc:  # voice analysis is a bonus: never lose the transcript over it
+            log.exception("Voice analysis failed for session %s", session_id)
+            voice_report = {"used": False, "error": str(exc)[:300]}
+    voiced = bool(voice_report and voice_report.get("used"))
+    if guessed and voiced:
+        warning = (
+            "Speakers were told apart by voice analysis only. For the most reliable result, add your free "
+            "Hugging Face token as HF_TOKEN in .env (see README), then use Re-process."
+        )
     del audio
 
     turn_dicts = build_turns(segments)
     if not turn_dicts:
         raise PipelineError("No speech was found in this recording.")
-    if guessed:
-        counsellor = "SPEAKER_00"
+    if voice_report and voice_report.get("counsellor_label"):
+        counsellor = voice_report["counsellor_label"]  # matches the counsellor's saved voiceprint
+        how = "voiceprint"
+    elif guessed and not voiced:
+        counsellor, how = "SPEAKER_00", "question guess"
     else:
         counsellor, how = detect_counsellor(turn_dicts)
-        log.info("Session %s: counsellor is %s (%s)", session_id, counsellor, how)
+    log.info("Session %s: counsellor is %s (%s)", session_id, counsellor, how)
     roles = [Role.counsellor if t["speaker_raw"] == counsellor else Role.client for t in turn_dicts]
+    if voice_report is not None:
+        voice_report["counsellor_by"] = how
+        voice_report["uncertain_turns"] = sum(
+            1 for t in turn_dicts if t["speaker_confidence"] is not None and t["speaker_confidence"] < UNSURE_BELOW
+        )
 
     with DBSession(engine) as db:
         clear_transcript(db, session_id)
@@ -204,10 +231,12 @@ def _process(session_id: int, progress) -> None:
             db.add(Turn(
                 session_id=session_id, index=i, speaker_raw=t["speaker_raw"], role=role,
                 start=t["start"], end=t["end"], text=t["text"], words_json=t["words"],
+                speaker_confidence=t["speaker_confidence"],
             ))
         db.commit()
         rebuild_exchanges(db, session_id)
-    _set_status(session_id, SessionStatus.ready, counsellor_speaker=counsellor, warning=warning)
+    _set_status(session_id, SessionStatus.ready, counsellor_speaker=counsellor, warning=warning,
+                voice_check=voice_report)
     progress(100)
 
 

@@ -66,6 +66,8 @@ class Session(SessionBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     audio_path: Optional[str] = None  # processed 16 kHz WAV (encrypted when a key is set)
     original_path: Optional[str] = None  # the uploaded file / joined recording, kept for re-processing
+    # Voice analysis report: {"used", "diarized", "corrected", "uncertain_turns", "counsellor_label", ...}
+    voice_check: Optional[dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
 
 
 class Turn(SQLModel, table=True):
@@ -80,6 +82,9 @@ class Turn(SQLModel, table=True):
     # [{"word": "um,", "start": 1.2, "end": 1.4, "score": 0.91}, ...]
     words_json: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
     edited: bool = False
+    # How sure the voice analysis is about who said this (0.5 = could be either, 1.0 = certain or
+    # confirmed by the counsellor). None = not checked.
+    speaker_confidence: Optional[float] = None
 
 
 class Exchange(SQLModel, table=True):
@@ -117,6 +122,7 @@ def _iso_utc(value: Optional[datetime]) -> Optional[str]:
 class SessionRead(SessionBase):
     id: int
     has_audio: bool = False
+    voice_check: Optional[dict[str, Any]] = None
 
     @field_serializer("created_at", "consent_at", "audio_deleted_at")
     def _as_utc(self, value: Optional[datetime]) -> Optional[str]:
@@ -199,20 +205,26 @@ def _migrate() -> None:
     from sqlalchemy import inspect, text
 
     insp = inspect(engine)
-    if "session" not in insp.get_table_names():
-        return
-    have = {c["name"] for c in insp.get_columns("session")}
     wanted = {
-        "warning": "VARCHAR",
-        "noise_reduction": "VARCHAR DEFAULT 'light' NOT NULL",
-        "detected_language": "VARCHAR",
-        "audio_deleted_at": "DATETIME",
-        "original_path": "VARCHAR",
+        "session": {
+            "warning": "VARCHAR",
+            "noise_reduction": "VARCHAR DEFAULT 'light' NOT NULL",
+            "detected_language": "VARCHAR",
+            "audio_deleted_at": "DATETIME",
+            "original_path": "VARCHAR",
+            "voice_check": "JSON",
+        },
+        "turn": {"speaker_confidence": "FLOAT"},
     }
+    tables = insp.get_table_names()
     with engine.begin() as conn:
-        for name, ddl in wanted.items():
-            if name not in have:
-                conn.execute(text(f"ALTER TABLE session ADD COLUMN {name} {ddl}"))
+        for table, columns in wanted.items():
+            if table not in tables:
+                continue
+            have = {c["name"] for c in insp.get_columns(table)}
+            for name, ddl in columns.items():
+                if name not in have:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
 
 
 def init_db() -> None:

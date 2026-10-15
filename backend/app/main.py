@@ -47,6 +47,7 @@ from .models import (
     utcnow,
 )
 from .pipeline import audio as audio_mod
+from .pipeline import voices
 from .pipeline.turns import PAUSE_RE, rebuild_exchanges, reindex, session_turns
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -117,6 +118,7 @@ def health() -> dict:
             "whisperx": importlib.util.find_spec("whisperx") is not None,
             "hf_token": bool(settings.hf_token),
             "encryption": storage.encryption_enabled(),
+            "voice_check": settings.voice_check,
             "whisper_model": settings.whisper_model,
             "llm_model": settings.llm_model_name,
         },
@@ -563,6 +565,7 @@ def update_turn(turn_id: int, body: TurnUpdate, db: DB):
             t.text, t.edited = text, True
     if body.role is not None and body.role != t.role:
         t.role, regroup = body.role, True
+        t.speaker_confidence = 1.0  # confirmed by the counsellor
     db.add(t)
     db.commit()
     if regroup:
@@ -602,8 +605,10 @@ def split_turn(turn_id: int, body: TurnSplit, db: DB):
     db.add(Turn(
         session_id=s.id, index=t.index + 1, speaker_raw=other_speaker, role=other_role,
         start=round(split_time, 3), end=t.end, text=right, words_json=right_words, edited=t.edited,
+        speaker_confidence=1.0,
     ))
     t.text, t.words_json, t.end = left, left_words, round(split_time, 3)
+    t.speaker_confidence = 1.0
     db.add(t)
     db.commit()
     reindex(db, s.id)
@@ -626,6 +631,70 @@ def update_exchange(exchange_id: int, body: ExchangeUpdate, db: DB):
     db.commit()
     db.refresh(ex)
     return ex
+
+
+# ---------------------------------------------------------------------------
+# Counsellor voiceprint (helps voice analysis tell the counsellor from the client)
+# ---------------------------------------------------------------------------
+
+
+def _voice_info() -> dict:
+    vp = voices.load_voiceprint()
+    if not vp:
+        return {"enrolled": False}
+    return {"enrolled": True, "seconds": vp["seconds"], "source": vp["source"], "updated_at": vp["updated_at"]}
+
+
+@api.get("/voice")
+def voice_status() -> dict:
+    return _voice_info()
+
+
+@api.post("/voice/enroll")
+def voice_enroll(file: Annotated[UploadFile, File()]) -> dict:
+    """Save the counsellor's voiceprint from a short recording of them reading aloud.
+    Only the fingerprint (a list of numbers) is kept; the recording is deleted straight away."""
+    ext = Path(file.filename or "voice.webm").suffix.lower() or ".webm"
+    if ext not in AUDIO_EXTENSIONS:
+        ext = ".webm"
+    with tempfile.TemporaryDirectory(dir=settings.data_path / "tmp") as tmp:
+        src, wav = Path(tmp) / f"upload{ext}", Path(tmp) / "voice16k.wav"
+        src.write_bytes(file.file.read())
+        try:
+            audio_mod.convert_to_wav(src, wav, "light")
+            samples = audio_mod.wav_to_array(wav.read_bytes())
+            vec, seconds = voices.voiceprint_from_audio(samples)
+        except (audio_mod.AudioError, ValueError) as exc:
+            raise HTTPException(400, str(exc))
+    voices.save_voiceprint(vec, seconds, "recording")
+    return _voice_info()
+
+
+@api.post("/voice/learn/{session_id}")
+def voice_learn(session_id: int, db: DB) -> dict:
+    """Add the counsellor turns of a reviewed session to the voiceprint (after roles were checked)."""
+    s = _get(db, session_id)
+    if not s.audio_path or not Path(s.audio_path).exists():
+        raise HTTPException(400, "This session has no audio any more.")
+    spans = [
+        (t.start, t.end) for t in session_turns(db, session_id)
+        if t.role == Role.counsellor and t.end - t.start >= 1.5
+    ]
+    if not spans:
+        raise HTTPException(400, "There are no counsellor turns long enough to learn from.")
+    samples = audio_mod.wav_to_array(storage.read_bytes(Path(s.audio_path)))
+    try:
+        vec, seconds = voices.voiceprint_from_audio(samples, spans)
+    except ValueError:
+        raise HTTPException(400, "Not enough counsellor speech in this session (at least 8 seconds is needed).")
+    voices.save_voiceprint(vec, seconds, f"session {s.client_code}", blend=True)
+    return _voice_info()
+
+
+@api.delete("/voice")
+def voice_delete() -> dict:
+    voices.delete_voiceprint()
+    return _voice_info()
 
 
 app.include_router(api)

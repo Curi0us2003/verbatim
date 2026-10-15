@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     hf_token: str = ""
     diarization_model: str = "pyannote/speaker-diarization-3.1"
 
+    # Voice analysis: second layer for who-said-what (free model, no token needed)
+    voice_check: bool = True
+    voice_model: str = "pyannote/wespeaker-voxceleb-resnet34-LM"
+
     # Ollama
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen2.5:7b"

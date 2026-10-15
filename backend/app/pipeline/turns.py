@@ -35,12 +35,14 @@ def build_turns(segments: list[dict], split_every_segment: bool = False) -> list
             else:
                 begin = start if start is not None else (prev_end if prev_end is not None else seg["start"])
                 turn = {"speaker_raw": speaker, "start": begin, "end": begin, "tokens": [], "words": [],
-                        "segment": seg_no}
+                        "segment": seg_no, "confs": []}
                 turns.append(turn)
             if start is not None and prev_end is not None and start - prev_end > PAUSE_MIN_SEC:
                 turn["tokens"].append(f"[pause {round(start - prev_end)}s]")
             turn["tokens"].append(w["word"])
             turn["words"].append({k: w.get(k) for k in ("word", "start", "end", "score")})
+            if w.get("spk_conf") is not None:
+                turn["confs"].append(w["spk_conf"])
             end = w.get("end") if w.get("end") is not None else start
             if end is not None:
                 prev_end = end
@@ -52,6 +54,8 @@ def build_turns(segments: list[dict], split_every_segment: bool = False) -> list
             "end": round(float(max(t["end"], t["start"])), 3),
             "text": " ".join(t["tokens"]),
             "words": t["words"],
+            # the least certain stretch decides: one doubtful part is enough to ask the counsellor
+            "speaker_confidence": min(t["confs"]) if t["confs"] else None,
         }
         for t in turns
         if t["words"]

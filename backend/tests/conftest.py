@@ -31,6 +31,7 @@ os.environ["TRANSCRIBE_ENGINE"] = "local"
 os.environ["LLM_ENGINE"] = "ollama"
 os.environ["ENCRYPTION_KEY"] = Fernet.generate_key().decode()
 os.environ["HF_TOKEN"] = ""
+os.environ["VOICE_CHECK"] = "false"  # tests that need it switch it on with fake fingerprints
 if os.environ.get("VERBATIM_REAL_MODELS") != "1":
     os.environ["MODELS_DIR"] = ""
 
@@ -159,3 +160,36 @@ def wait_ready(client, session_id: int) -> dict:
 
     worker.wait_idle()
     return client.get(f"/api/sessions/{session_id}").json()
+
+
+def fake_window_fingerprints(lines, dim: int = 16, seed: int = 0):
+    """Stand-in for the voice model: windows inside a line get that speaker's voice (plus a little
+    noise); windows in silence get random vectors."""
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    voices = {spk: rng.normal(size=dim) for spk in {line[3] for line in lines}}
+
+    def fingerprints(audio, device):
+        centres = np.arange(0.75, len(audio) / 16000 - 0.75, 0.5)
+        vecs = []
+        for c in centres:
+            spk = next((line[3] for line in lines if line[0] <= c <= line[1]), None)
+            base = voices[spk] if spk else rng.normal(size=dim)
+            vecs.append(base + rng.normal(scale=0.3, size=dim))
+        m = np.array(vecs, dtype=np.float32)
+        return m / np.linalg.norm(m, axis=1, keepdims=True), centres
+
+    return fingerprints, voices
+
+
+@pytest.fixture
+def fake_voices(monkeypatch):
+    """Voice analysis on, with synthetic fingerprints following the sample dialogue's speakers."""
+    from app.config import settings
+    from app.pipeline import voices
+
+    fingerprints, base = fake_window_fingerprints(LINES)
+    monkeypatch.setattr(voices, "window_fingerprints", fingerprints)
+    monkeypatch.setattr(settings, "voice_check", True)
+    return base
