@@ -3,8 +3,9 @@
 //            npm run setup -- --core  (skip the ~4 GB speech packages, e.g. when using Groq)
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { homedir } from "node:os";
 import { existsSync, copyFileSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, parse } from "node:path";
 import { ROOT, BACKEND, venvDir, venvPython } from "./venv-python.mjs";
 
 const coreOnly = process.argv.includes("--core");
@@ -44,6 +45,34 @@ if (/^ENCRYPTION_KEY=\s*$/m.test(envText)) {
   writeFileSync(envFile, envText);
   console.log("Generated an audio encryption key in .env — keep a backup copy of it somewhere safe.");
 }
+
+// A .env copied from another computer can point at a drive this one does not have (e.g. D:).
+// Put such folders back to their defaults inside the Verbatim folder.
+const defaults = { VENV_DIR: "", MODELS_DIR: "", DATA_DIR: "data" };
+for (const [key, fallback] of Object.entries(defaults)) {
+  const match = envText.match(new RegExp(`^${key}=([^#\\r\\n]*)`, "m"));
+  const value = match ? match[1].trim() : "";
+  if (value && isAbsolute(value) && !existsSync(parse(value).root)) {
+    envText = envText.replace(new RegExp(`^${key}=[^#\\r\\n]*`, "m"), `${key}=${fallback}`);
+    console.log(`.env: ${key} pointed to ${value}, but drive ${parse(value).root} does not exist on this computer. Using the default instead.`);
+  }
+}
+
+// Session recordings must not land in a cloud-synced folder (OneDrive, Dropbox, Google Drive, iCloud).
+const synced = /onedrive|dropbox|google ?drive|icloud/i;
+const dataMatch = envText.match(/^DATA_DIR=([^#\r\n]*)/m);
+const dataDir = dataMatch ? dataMatch[1].trim() : "data";
+if (synced.test(ROOT) && !isAbsolute(dataDir)) {
+  if (existsSync(join(ROOT, dataDir, "verbatim.sqlite3"))) {
+    console.warn(`\nWARNING: Verbatim's data is in ${join(ROOT, dataDir)}, inside a cloud-synced folder.`);
+    console.warn("Session recordings may be uploaded to that cloud. Move the folder out and set DATA_DIR in .env.\n");
+  } else {
+    const safe = join(homedir(), "VerbatimData").replaceAll("\\", "/");
+    envText = envText.replace(/^DATA_DIR=[^#\r\n]*/m, `DATA_DIR=${safe}`);
+    console.log(`This folder is synced to the cloud, so session data will be kept in ${safe} instead.`);
+  }
+}
+writeFileSync(envFile, envText);
 
 // Keep pip's temporary files next to the environment (useful when the system drive is full).
 const venv = venvDir();
