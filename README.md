@@ -7,6 +7,17 @@ by default.
 
 The full design is in [SPEC.md](SPEC.md). Build status and notes for developers are in [CLAUDE.md](CLAUDE.md).
 
+## Quick start on a Windows laptop
+
+1. Download the code: on GitHub click **Code → Download ZIP** and unzip it (or `git clone` it).
+   Put the folder somewhere **outside OneDrive/Dropbox/Google Drive**, for example `C:\Verbatim` or `D:\Verbatim`.
+2. Double-click **`Setup Verbatim.bat`** (once). It checks for Node.js, Python and Ollama, offers to install
+   anything missing, installs Verbatim (10–30 minutes, about 10 GB), and can put a **Verbatim** shortcut on the desktop.
+3. Double-click **`Start Verbatim.bat`** (or the desktop shortcut) whenever you want to use the app. The
+   browser opens by itself. Keep the black window open while you work; close it to stop Verbatim.
+
+On macOS or Linux, use `./setup.sh` once and then `./start.sh`. The manual steps below explain what the setup does.
+
 ## 1. Install the tools (once)
 
 | Tool | What for | How |

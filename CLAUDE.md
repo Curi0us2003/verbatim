@@ -43,6 +43,7 @@ Counselling session verbatim app. **SPEC.md is the source of truth**; re-read it
 ## How to run
 - `npm install` then `npm run setup` (once): .env (+ generated ENCRYPTION_KEY), venv (VENV_DIR), core + speech
   packages (CUDA torch if nvidia-smi found), frontend packages. `npm run setup -- --core` skips speech packages.
+- `Setup Verbatim.bat` (scripts/setup-windows.ps1, `-CheckOnly` to only report) and `Start Verbatim.bat` (scripts/start.mjs = `npm start`: runs dev servers, waits for /api/health, opens browser; detects already running). setup.sh / start.sh for macOS/Linux.
 - `npm run dev`: FastAPI on 127.0.0.1:8000 + Vite on 127.0.0.1:5173 (proxies `/api`). No auto-reload on purpose
   (OneDrive touches files → reload mid-transcription). `npm run dev:watch` = with backend auto-reload for development.
 - After speech models load, lifespan shutdown calls os._exit (CUDA libs hang Python exit on Windows).

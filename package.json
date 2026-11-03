@@ -3,6 +3,7 @@
   "private": true,
   "description": "Counselling session verbatim app - runs the backend and frontend together",
   "scripts": {
+    "start": "node scripts/start.mjs",
     "setup": "node scripts/setup.mjs",
     "dev": "concurrently -k -n api,web -c green,blue \"node scripts/dev-api.mjs\" \"npm run dev --prefix frontend\"",
     "dev:watch": "concurrently -k -n api,web -c green,blue \"node scripts/dev-api.mjs --reload\" \"npm run dev --prefix frontend\"",
